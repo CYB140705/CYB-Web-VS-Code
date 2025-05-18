@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CYB-仿VS Code IDE(Web)</title>
+    <link rel="icon" href="https://i-1.92sucai.com/2023/7/14/5541b41c-d8b8-465a-8edd-db5c2cef1a94.png">
+    <style>
+        body { 
+            margin: 0;
+            background: #1e1e1e;
+            height: 100vh;
+            display: flex;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        #container { flex:1; display: flex; flex-direction: column }
+        #editor { height:80vh; border:1px solid #333 }
+        .toolbar { padding:10px; background:#252526; display:flex; gap:8px }
+        button { background:#0e639c; color:white; border:none; padding:6px 12px; cursor:pointer }
+        input[type="file"] { display:none }
+        /* 配置弹窗样式 */
+        #configModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #252526;
+            padding: 20px;
+            border: 1px solid #333;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="toolbar">
+            <button onclick="document.getElementById('fileInput').click()">📁 打开文件</button>
+            <button onclick="formatCode()">✨ 格式化</button>
+            <button onclick="fileHandler.saveFile()">💾 保存</button>
+            <button onclick="showConfig()">⚙️ 植入设置</button>
+            <a href="day1 VS Code-she-ji-chu-zhong-Dome.html" target="_blank">设计初衷</a>
+            <a href="day-1 VS Code-Dome.html" target="_blank">声明</a>
+            <input type="file" id="fileInput" accept=".html,.js,.css,.json,.py,.java,.php">
+        </div>
+        <div id="editor"></div>
+    </div>
+
+    <!-- 配置弹窗 -->
+    <div id="configModal">
+        <h3 style="color:white; margin-top:0">自定义声明设置</h3>
+        <textarea id="headerContent" 
+                  style="width:300px; height:100px; background:#1e1e1e; color:white; padding:8px"
+                  placeholder="输入要植入的内容（可用变量：\n{{date}} - 当前时间\n{{filename}} - 文件名）"></textarea>
+        <div style="margin-top:15px; display:flex; gap:8px">
+            <button onclick="saveConfig()">保存</button>
+            <button onclick="hideConfig()" style="background:#666">取消</button>
+        </div>
+    </div>
+
+    <!-- Monaco Editor 加载 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+    <script>
+        // 初始化编辑器
+        let editor;
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '// 输入或打开文件开始编辑(这是JavaScript,编辑其他请导入文件)\n// 请勿刷新,后果自负!\n//--------------\n// 作者:CYB\n// 未经允许,禁止商用\n// GitHub地址:https://github.com/CYB140705/CYB-Web-VS-Code\n//--------------\n//                                                                     Here Your Code...',
+                language: 'javascript',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false
+            });
+        });
+
+        // 文件操作模块
+        const fileHandler = {
+            readFile(input) {
+                const file = input.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = e => {
+                    editor.setValue(e.target.result);
+                    monaco.editor.setModelLanguage(editor.getModel(), this.detectLanguage(file.name));
+                };
+                reader.readAsText(file);
+            },
+
+            detectLanguage(filename) {
+                const ext = filename.split('.').pop();
+                const langMap = {
+                    js: 'javascript',
+                    html: 'html',
+                    css: 'css',
+                    py: 'python',
+                    java: 'java',
+                    php: 'php'
+                };
+                return langMap[ext] || 'plaintext';
+            },
+
+            saveFile() {
+                const content = this.generateContent();
+                const blob = new Blob([content], {type: 'text/plain'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = this.generateFilename();
+                a.click();
+                URL.revokeObjectURL(url);
+            },
+
+            generateContent() {
+                const template = implantConfig.header
+                    .replace(/{{date}}/g, new Date().toLocaleString())
+                    .replace(/{{filename}}/g, this.generateFilename());
+                return template + editor.getValue();
+            },
+
+            generateFilename() {
+                return `CYB-VS Code IDE_${new Date().toISOString().slice(0,10)}_${Math.random().toString(36).slice(2, 7)}.html`;
+            }
+        };
+
+        // 配置模块
+        let implantConfig = {
+            header: `// {{date}}\n// 此文件由 CYB-VS Code IDE 生成\n// 版权所有，禁止非法商用\n\n`
+        };
+
+        // 初始化配置
+        (function initConfig() {
+            const savedConfig = localStorage.getItem('implantConfig');
+            if (savedConfig) implantConfig = JSON.parse(savedConfig);
+        })();
+
+        // 配置相关函数
+        function showConfig() {
+            document.getElementById('headerContent').value = implantConfig.header;
+            document.getElementById('configModal').style.display = 'block';
+        }
+
+        function hideConfig() {
+            document.getElementById('configModal').style.display = 'none';
+        }
+
+        function saveConfig() {
+            implantConfig.header = document.getElementById('headerContent').value;
+            localStorage.setItem('implantConfig', JSON.stringify(implantConfig));
+            hideConfig();
+        }
+
+        // 事件监听
+        document.getElementById('fileInput').addEventListener('change', function() {
+            fileHandler.readFile(this);
+        });
+
+        // 格式化代码
+        function formatCode() {
+            editor.getAction('editor.action.formatDocument').run();
+        }
+    </script>
+</body>
+</html>
